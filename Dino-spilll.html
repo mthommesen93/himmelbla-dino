@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+  <meta charset="UTF-8">
+  <title>Himmelblå dino-pause</title>
+</head>
+<body style="margin:0; font-family:sans-serif; background:#e6f3ff;">
+
+  <div style="max-width:700px;margin:24px auto;padding:16px 20px;background:#ffffff;border-radius:16px;box-shadow:0 4px 12px rgba(0,0,0,0.08);">
+    <h2 style="margin-top:0;margin-bottom:4px;color:#1e3a8a;">
+      🦕 Himmelblå dino-pause
+    </h2>
+    <p style="margin-top:0;margin-bottom:12px;color:#334155;font-size:14px;">
+      Trenger du et lite avbrekk? Hjelp dinoen å hoppe over trærne. <br>
+      Styring: <strong>SPACE</strong> eller klikk/tap i spillet for å hoppe.
+    </p>
+
+    <canvas id="dinoGame" width="640" height="220" style="width:100%;max-width:640px;border-radius:12px;border:1px solid #bfdbfe;background:#dbeafe;display:block;"></canvas>
+
+    <div style="margin-top:10px;font-size:13px;color:#334155;">
+      <span id="scoreInfo"></span><br>
+      <span id="recordInfo"></span>
+    </div>
+
+    <p id="message" style="margin-top:10px;font-size:13px;color:#0f766e;"></p>
+  </div>
+
+  <script>
+  (function () {
+    const canvas = document.getElementById("dinoGame");
+    if (!canvas || !canvas.getContext) return;
+    const ctx = canvas.getContext("2d");
+
+    const groundY = 180;
+    const gravity = 0.6;
+    const jumpStrength = -11;
+
+    const dino = {
+      x: 70,
+      y: groundY - 45,
+      width: 32,
+      height: 45,
+      vy: 0,
+      jumping: false
+    };
+
+    const tree = {
+      x: canvas.width,
+      width: 26,
+      height: 60,
+      speed: 5,
+      passed: false
+    };
+    tree.y = groundY - tree.height;
+
+    let score = 0;
+    let highScore = 0;
+    let lastScore = 0;
+    let gameState = "start"; // start, running, gameover
+
+    const STORAGE_KEY = "himmelblaDinoHighscore";
+    const scoreInfoEl = document.getElementById("scoreInfo");
+    const recordInfoEl = document.getElementById("recordInfo");
+    const messageEl = document.getElementById("message");
+
+    // Hent lagret rekord fra localStorage
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored && !isNaN(parseInt(stored, 10))) {
+      highScore = parseInt(stored, 10);
+    }
+
+    function updateInfoText() {
+      scoreInfoEl.textContent = "Din nåværende score: " + score + (lastScore ? "  |  Forrige runde: " + lastScore : "");
+      recordInfoEl.textContent = "Din lagrede rekord på denne PC-en: " + highScore;
+    }
+
+    function resetGame() {
+      lastScore = score;
+      score = 0;
+      dino.y = groundY - dino.height;
+      dino.vy = 0;
+      dino.jumping = false;
+
+      tree.x = canvas.width + 60;
+      tree.speed = 5;
+      tree.passed = false;
+
+      gameState = "running";
+      messageEl.textContent = "";
+      updateInfoText();
+    }
+
+    function jump() {
+      if (gameState === "start" || gameState === "gameover") {
+        resetGame();
+        return;
+      }
+      if (!dino.jumping && gameState === "running") {
+        dino.vy = jumpStrength;
+        dino.jumping = true;
+      }
+    }
+
+    function update() {
+      if (gameState !== "running") return;
+
+      dino.vy += gravity;
+      dino.y += dino.vy;
+
+      if (dino.y + dino.height >= groundY) {
+        dino.y = groundY - dino.height;
+        dino.vy = 0;
+        dino.jumping = false;
+      }
+
+      tree.x -= tree.speed;
+
+      if (tree.x + tree.width < 0) {
+        tree.x = canvas.width + 80 + Math.random() * 180;
+        tree.speed += 0.15; // gradvis vanskeligere
+        tree.passed = false;
+      }
+
+      if (!tree.passed && tree.x + tree.width < dino.x) {
+        tree.passed = true;
+        score++;
+        if (score > highScore) {
+          highScore = score;
+          localStorage.setItem(STORAGE_KEY, highScore.toString());
+          messageEl.textContent = "🏆 Ny personlig Himmelblå-rekord!";
+        }
+        updateInfoText();
+      }
+
+      // Kollisjon
+      if (
+        dino.x < tree.x + tree.width &&
+        dino.x + dino.width > tree.x &&
+        dino.y < tree.y + tree.height &&
+        dino.y + dino.height > tree.y
+      ) {
+        gameState = "gameover";
+        messageEl.textContent = "Game over! Trykk SPACE eller klikk for å prøve igjen ☀️";
+      }
+    }
+
+    function drawBackground() {
+      // himmel
+      ctx.fillStyle = "#e0f2fe";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // "sol"
+      ctx.beginPath();
+      ctx.arc(canvas.width - 60, 40, 22, 0, Math.PI * 2);
+      ctx.fillStyle = "#facc15";
+      ctx.fill();
+
+      // bakke
+      ctx.fillStyle = "#bfdbfe";
+      ctx.fillRect(0, groundY, canvas.width, canvas.height - groundY);
+      ctx.fillStyle = "#38bdf8";
+      ctx.fillRect(0, groundY + 8, canvas.width, 3);
+    }
+
+    function drawDino() {
+      // kropp
+      ctx.fillStyle = "#1d4ed8";
+      ctx.fillRect(dino.x, dino.y, dino.width, dino.height);
+
+      // hode
+      ctx.fillRect(dino.x + dino.width - 6, dino.y + 6, 18, 18);
+
+      // øye
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(dino.x + dino.width + 4, dino.y + 8, 5, 5);
+      ctx.fillStyle = "#0f172a";
+      ctx.fillRect(dino.x + dino.width + 5, dino.y + 9, 3, 3);
+
+      // hale
+      ctx.beginPath();
+      ctx.moveTo(dino.x, dino.y + dino.height - 6);
+      ctx.lineTo(dino.x - 16, dino.y + dino.height - 2);
+      ctx.lineTo(dino.x, dino.y + dino.height - 16);
+      ctx.closePath();
+      ctx.fillStyle = "#1d4ed8";
+      ctx.fill();
+    }
+
+    function drawTree() {
+      // stamme
+      ctx.fillStyle = "#854d0e";
+      ctx.fillRect(tree.x, tree.y, tree.width, tree.height);
+
+      // krone
+      ctx.fillStyle = "#16a34a";
+      ctx.beginPath();
+      ctx.moveTo(tree.x - 8, tree.y + 15);
+      ctx.lineTo(tree.x + tree.width / 2, tree.y - 18);
+      ctx.lineTo(tree.x + tree.width + 8, tree.y + 15);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    function drawText() {
+      ctx.fillStyle = "#0f172a";
+      ctx.font = "14px sans-serif";
+      ctx.fillText("Score: " + score, 12, 22);
+      ctx.fillText("Rekord: " + highScore, 12, 42);
+
+      if (gameState === "start") {
+        ctx.font = "18px sans-serif";
+        ctx.fillText("Trykk SPACE eller klikk for å starte 🦕", 90, 110);
+      } else if (gameState === "gameover") {
+        ctx.font = "20px sans-serif";
+        ctx.fillText("Game over!", 250, 90);
+        ctx.font = "16px sans-serif";
+        ctx.fillText("Trykk SPACE eller klikk for å prøve igjen", 150, 120);
+      }
+    }
+
+    function loop() {
+      drawBackground();
+      if (gameState === "running") update();
+      drawDino();
+      drawTree();
+      drawText();
+      requestAnimationFrame(loop);
+    }
+
+    document.addEventListener("keydown", function (e) {
+      if (e.code === "Space" || e.key === " ") {
+        e.preventDefault();
+        jump();
+      }
+    });
+
+    canvas.addEventListener("click", jump);
+    canvas.addEventListener("touchstart", function (e) {
+      e.preventDefault();
+      jump();
+    });
+
+    updateInfoText();
+    loop();
+  })();
+  </script>
+</body>
+</html>
